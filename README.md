@@ -77,8 +77,8 @@ Role Variables
         machine_name: (-%s is appended by default)
         machine_options: (list)
         extra_config: insert arbitrary extra runner config here (block)
-      N.B. Docker settings must be defined for both docker and dockerm
-      executors.
+      N.B. Docker settings must be defined for both docker and
+      docker+machine executors.
     
 Dependencies
 ------------
