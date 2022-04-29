@@ -1,0 +1,193 @@
+---
+# file: roles/gitlab-runner/tasks/main.yml
+# tasks file for gitlab-runner
+
+# Note: for Ansible 2.9, must use this version:
+- name: install Python gitlab module
+  pip:
+    name: python-gitlab
+    state: present
+    version: 1.12.1 # see Ansible 2.9 PR #65049
+  tags:
+    - gitlab-runner-install
+    - gitlab-runner-install-py
+
+- name: download script to add GitLab package repository
+  get_url:
+    url: "{{ gitlab_repo_script }}"
+    dest: /root/gitlab-runner-rpm.sh
+    mode: '0440'
+  tags: gitlab-runner-install
+
+- name: add GitLab repository
+  command: bash /root/gitlab-runner-rpm.sh
+  args:
+    creates: /etc/yum.repos.d/runner_gitlab-runner.repo
+  tags: gitlab-runner-install
+
+- name: install GitLab Runner package
+  package:
+    name: "{{ gitlab_runners_pkg }}"
+    state: "{{ gitlab_runners_pkg_state }}"
+  tags: gitlab-runner-install
+
+# used for access with cloud drivers:
+- name: create Runner SSH key pair
+  user:
+    name: gitlab-runner
+    generate_ssh_key: yes
+  tags: gitlab-runner-install
+
+- name: download docker-machine binary and put in /usr/local/sbin
+  get_url:
+    url: "{{ gitlab_dockerm_url }}"
+    dest: /usr/local/sbin/docker-machine
+    owner: root
+    group: root
+    mode: '0755'
+  when: "'docker+machine' in (gitlab_runners | map(attribute='executor') | list)"
+  tags:
+    - gitlab-runner-install
+    - gitlab-runner-install-dockerm
+
+- name: check for existing runner configuration
+  stat:
+    path: /etc/gitlab-runner/config.toml
+    get_attributes: no
+    get_checksum: no
+    get_mime: no
+  register: gitlab_runners_config_file
+  check_mode: no
+  tags:
+    - gitlab-runner-config
+
+- name: read existing configuration
+  slurp:
+    src: /etc/gitlab-runner/config.toml
+  register: gitlab_runners_config
+  check_mode: no
+  tags:
+    - gitlab-runner-config
+
+- name: parse existing configuration
+  set_fact:
+    gitlab_runners_config_parsed: "{{ gitlab_runners_config.content | b64decode | from_toml }}"
+  check_mode: no
+  tags:
+    - gitlab-runner-config
+
+- debug:
+    var: gitlab_runners_config_parsed
+    verbosity: 1
+  tags:
+    - gitlab-runner-config
+
+- name: check for cached registration token
+  stat:
+    path: "{{ gitlab_runners_cache_file }}"
+    get_attributes: no
+    get_checksum: no
+    get_mime: no
+  register: gitlab_runners_token_file
+  check_mode: no
+  tags:
+    - gitlab-runner-config
+    - gitlab-runner-config-token
+
+- name: read registration token from local cache
+  slurp:
+    src: "{{ gitlab_runners_cache_file }}"
+  register: gitlab_runners_token_cache
+  when: gitlab_runners_cache_token | bool and gitlab_runners_token_file.stat.exists
+  check_mode: no
+  tags:
+    - gitlab-runner-config
+    - gitlab-runner-config-token
+
+- name: set registration token from cache
+  set_fact:
+    gitlab_runners_token: "{{ gitlab_runners_token_cache.content | b64decode }}"
+  when: gitlab_runners_token is not defined and gitlab_runners_token_cache.content is defined and gitlab_runners_token_cache.content | length > 0
+  tags:
+    - gitlab-runner-config
+    - gitlab-runner-config-token
+
+- name: get registration token
+  command: >
+    gitlab-rails runner -e production "puts Gitlab::CurrentSettings.current_application_settings.runners_registration_token"
+  register: gitlab_runners_registration
+  delegate_to: "{{ gitlab_host }}"
+  changed_when: false
+  check_mode: no
+  when: gitlab_host is defined and (not gitlab_runners_cache_token | bool or not gitlab_runners_token_file.stat.exists)
+  tags:
+    - gitlab-runner-config
+    - gitlab-runner-config-token
+
+- name: set registration token from server
+  set_fact:
+    gitlab_runners_token: "{{ gitlab_runners_registration.stdout }}"
+  when: gitlab_runners_token is not defined and gitlab_host is defined and gitlab_runners_registration.rc is defined and gitlab_runners_registration.rc == 0
+  tags:
+    - gitlab-runner-config
+    - gitlab-runner-config-token
+
+# cache reg token locally because retrieving it from GitLab is slow:
+- name: write registration token to cache
+  copy:
+    dest: "{{ gitlab_runners_cache_file }}"
+    content: "{{ gitlab_runners_token }}"
+    owner: root
+    group: root
+    mode: '0400'
+  when: gitlab_runners_cache_token | bool and gitlab_runners_registration.rc is defined and gitlab_runners_registration.rc == 0
+  tags:
+    - gitlab-runner-config
+    - gitlab-runner-config-token
+
+- name: register runner
+  gitlab_runner:
+    access_level: "{{ item.access_level | default(omit) }}"
+    api_url: "{{ gitlab_url }}"
+    api_token: "{{ gitlab_token }}"
+    registration_token: "{{ gitlab_runners_token }}"
+    description: "{{ item.name }}"
+    tag_list: "{{ item.tags | default(omit) }}"
+    # if tags are defined, don't run untagged jobs:
+    run_untagged: "{{ not (item.tags is defined) | bool }}"
+    state: "{{ item.state | default(omit) }}"
+  with_items: "{{ gitlab_runners }}"
+  when: gitlab_runners_token is defined
+  register: gitlab_runners_reg
+  #no_log: true
+  tags:
+    - gitlab-runner-config
+
+- debug:
+    var: gitlab_runners_reg
+    verbosity: 1
+  tags:
+    - gitlab-runner-config
+
+- name: update runner configuration
+  template:
+    src: config.toml.j2
+    dest: /etc/gitlab-runner/config.toml
+    owner: root
+    group: root
+    mode: '0400'
+    backup: yes
+  when: gitlab_runners_reg.changed or (gitlab_runners_reconfig | bool)
+  tags:
+    - gitlab-runner-config
+
+- name: add docker clean-up job
+  copy:
+    src: clear-docker-cache.cron
+    dest: /etc/cron.weekly/clear-docker-cache.cron
+    owner: root
+    group: root
+    mode: '0555'
+  when: "'docker' in (gitlab_runners | map(attribute='executor') | list)"
+  tags:
+    - gitlab-runner-cron

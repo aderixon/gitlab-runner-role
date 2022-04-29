@@ -1,0 +1,3 @@
+#!/bin/sh
+
+[ -x /usr/share/gitlab-runner/clear-docker-cache ] && /usr/share/gitlab-runner/clear-docker-cache >/dev/null

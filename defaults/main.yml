@@ -1,0 +1,17 @@
+---
+# file: roles/gitlab-runner/defaults/main.yml
+# defaults file for gitlab-runner
+
+# GitLab repo installer script URL:
+gitlab_repo_script: 'https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.rpm.sh'
+# location of docker-machine binary:
+gitlab_dockerm_url: 'https://gitlab-docker-machine-downloads.s3.amazonaws.com/v0.16.2-gitlab.12/docker-machine-Linux-x86_64'
+
+gitlab_runners_pkg: 'gitlab-runner'
+gitlab_runners_pkg_state: 'latest'
+
+gitlab_runners_reconfig: false
+gitlab_runners_cache_token: true
+gitlab_runners_cache_file: '/root/.gitlab_registration_token'
+
+gitlab_runners_concurrent: 1

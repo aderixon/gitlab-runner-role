@@ -1,0 +1,56 @@
+# {{ ansible_managed }}
+concurrent = {{ gitlab_runners_concurrent }}
+check_interval = 0
+
+{% if gitlab_runners_session_server_listen is defined %}
+[session_server]
+  listen_address = {{ gitlab_runners_session_server_listen | quote }}
+  session_timeout = 1800
+{% endif %}
+
+{% for r in gitlab_runners_reg.results %}
+[[runners]]
+  name = "{{ r.item.name }}"
+  limit = {{ r.item.limit | default(1) | int }}
+  url = "{{ gitlab_url }}"
+{% if r.runner.token is defined %}
+  token = "{{ r.runner.token }}"
+{% else %}
+  token = "{{ gitlab_runners_config_parsed.runners | selectattr('name', 'match', (r.item.name | regex_escape)) | map(attribute='token') | list | default(['UNREGISTERED'], true) | first }}"
+{% endif %}
+  executor = "{{ r.item.executor }}"
+{% if r.item.cache_dir is defined %}
+  cache_dir = {{ r.item.cache_dir }}
+{% endif %}
+{% if r.item.cache_s3_serveraddress is defined %}
+  [runners.cache]
+    Type = "s3"
+    Shared = true
+    [runners.cache.s3]
+      ServerAddress = "{{ r.item.cache_s3_serveraddress }}"
+      AccessKey = "{{ r.item.cache_s3_accesskey }}"
+      SecretKey = "{{ r.item.cache_s3_secretkey }}"
+      BucketName = "{{ r.item.cache_s3_bucket }}"
+{% endif %}
+{% if 'docker' in r.item.executor %}
+  [runners.custom_build_dir]
+  [runners.docker]
+    tls_verify = false
+    image = "{{ r.item.docker_image }}"
+    privileged = {{ r.item.docker_privileged | default(false) | string | lower }}
+    disable_entrypoint_overwrite = false
+    oom_kill_disable = false
+    disable_cache = false
+    volumes = {{ r.item.docker_volumes | to_json }}
+    shm_size = 0
+{% endif %}
+{% if r.item.executor == 'docker+machine' %}
+  [runners.machine]
+    IdleCount = {{ r.item.machine_idlecount | int }}
+    MaxBuilds = {{ r.item.machine_maxbuilds | default(1) | int }}
+    MachineDriver = "{{ r.item.machine_driver }}"
+    MachineName = "{{ r.item.machine_name + '-%s' }}"
+    MachineOptions = {{ r.item.machine_options | to_json }}
+{% endif %}
+{{ r.item.extra_config | default('') }}
+{% endfor %}
