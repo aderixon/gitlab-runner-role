@@ -58,25 +58,25 @@ Role Variables
     gitlab_runners:
       List of runners to register and configure, each containing:
       - name: "Name of runner" (must be unique and constant, and if this
-	  runner is already registered then the name must match)
-	executor: shell|docker|docker+machine
-	tags: (optional, list)
-	access_level: ref_protected|not_protected (optional)
-	cache_dir:
-	limit: max no. of concurrent jobs (default: 1)
-	cache_s3_serveraddress: hostname for S3 cache service (if used)
-	cache_s3_accesskey:
-	cache_s3_secretkey:
-	cache_s3_bucket: name of S3 bucket
-	docker_image:
-	docker_privileged: (boolean, default: false)
-	docker_volumes: (list, must include cache_dir if defined)
-	machine_idlecount:
-	machine_maxbuilds: (default: 1)
-	machine_driver:
-	machine_name: (-%s is appended by default)
-	machine_options: (list)
-	extra_config: insert arbitrary extra runner config here (block)
+          runner is already registered then the name must match)
+        executor: shell|docker|docker+machine
+        tags: (optional, list)
+        access_level: ref_protected|not_protected (optional)
+        cache_dir:
+        limit: max no. of concurrent jobs (default: 1)
+        cache_s3_serveraddress: hostname for S3 cache service (if used)
+        cache_s3_accesskey:
+        cache_s3_secretkey:
+        cache_s3_bucket: name of S3 bucket
+        docker_image:
+        docker_privileged: (boolean, default: false)
+        docker_volumes: (list, must include cache_dir if defined)
+        machine_idlecount:
+        machine_maxbuilds: (default: 1)
+        machine_driver:
+        machine_name: (-%s is appended by default)
+        machine_options: (list)
+        extra_config: insert arbitrary extra runner config here (block)
       N.B. Docker settings must be defined for both docker and dockerm
       executors.
     
@@ -89,7 +89,7 @@ Example Playbook
 ----------------
 
 ``` yaml
-    - hosts: servers
+    - hosts: runner_hosts
       vars:
         gitlab_host: 'mygit.example.com'
         gitlab_url: 'https://mygit.example.com/'
