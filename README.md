@@ -40,7 +40,7 @@ Role Variables
       API token for GitLab host.
     gitlab_runners_token:
       GitLab runner registration token; if not set, it will be retrieved
-      from the GitLab host if possible.
+      from the Rails interface on the GitLab host if possible.
     gitlab_runners_cache_token:
       Whether to cache the GitLab runner registration token locally to
       save time on repeated runs (boolean, default: true).
