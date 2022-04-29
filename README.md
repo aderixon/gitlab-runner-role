@@ -92,12 +92,12 @@ Example Playbook
     - hosts: servers
       vars:
         gitlab_host: 'mygit.example.com'
-	gitlab_url: 'https://mygit.example.com/'
-	gitlab_token: 'MyGitLabAPIToken'
-	gitlab_runners:
-	- name: 'GitLab Docker runner'
-	  executor: docker
-	  docker_image: alpine
+        gitlab_url: 'https://mygit.example.com/'
+        gitlab_token: 'MyGitLabAPIToken'
+        gitlab_runners:
+        - name: 'GitLab Docker runner'
+          executor: docker
+          docker_image: alpine
       roles:
          - { role: gitlab-runner }
 ```
